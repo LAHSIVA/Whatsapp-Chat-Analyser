@@ -8,7 +8,7 @@ import re
 import emoji
 import numpy as np
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
-
+nltk.download('vader_lexicon', quiet=True)
 extract = URLExtract()
 vader = SentimentIntensityAnalyzer()
 
