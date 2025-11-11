@@ -7,37 +7,27 @@ from nltk.stem import WordNetLemmatizer
 from nltk.corpus import stopwords
 
 # ---------- NLTK Setup ----------
-# Use a local nltk_data folder to avoid Streamlit Cloud issues
 nltk_data_dir = os.path.join(os.getcwd(), "nltk_data")
 os.makedirs(nltk_data_dir, exist_ok=True)
 nltk.data.path.append(nltk_data_dir)
 
-# Download necessary NLTK packages if missing
+# Download necessary packages if missing
 for pkg in ["punkt", "wordnet", "stopwords", "vader_lexicon"]:
     try:
-        nltk.data.find(f"tokenizers/{pkg}" if pkg == "punkt" else f"corpora/{pkg}")
+        nltk.data.find(f"tokenizers/{pkg}" if pkg=="punkt" else f"corpora/{pkg}")
     except LookupError:
         nltk.download(pkg, download_dir=nltk_data_dir, quiet=True)
 
-# Initialize lemmatizer and stopwords
 lemmatizer = WordNetLemmatizer()
 stop_words = set(stopwords.words("english"))
 
-# ---------- Preprocessing ----------
 def preprocess(raw_text: str) -> pd.DataFrame:
-    """
-    Parse WhatsApp exported chat text into a DataFrame.
-    Assumes WhatsApp format like: '12/12/20, 12:34 - Name: message'
-    """
-    # Split by WhatsApp datetime pattern
     pattern = r'(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2})\s-\s'
     parts = re.split(pattern, raw_text)
-    
+
     if len(parts) < 4:
-        # fallback minimal DataFrame
         return pd.DataFrame({'date': pd.to_datetime([]), 'user': [], 'message': []})
 
-    # Build entries
     entries = []
     i = 1
     while i < len(parts):
@@ -48,7 +38,6 @@ def preprocess(raw_text: str) -> pd.DataFrame:
 
     df = pd.DataFrame(entries, columns=['date_raw', 'user_message'])
 
-    # Convert datetime with flexible format
     def parse_dt(s):
         for fmt in ("%d/%m/%Y, %H:%M", "%d/%m/%y, %H:%M"):
             try:
@@ -59,7 +48,6 @@ def preprocess(raw_text: str) -> pd.DataFrame:
 
     df['date'] = df['date_raw'].apply(parse_dt)
 
-    # Split user and message
     users, msgs = [], []
     for um in df['user_message']:
         split = re.split(r'([^:]+):\s', um, maxsplit=1)
@@ -69,12 +57,11 @@ def preprocess(raw_text: str) -> pd.DataFrame:
         else:
             users.append('group_notification')
             msgs.append(um.strip())
-    
+
     df['user'] = users
     df['message'] = msgs
     df.drop(columns=['date_raw', 'user_message'], inplace=True)
 
-    # Time-derived columns
     df['only_date'] = df['date'].dt.date
     df['year'] = df['date'].dt.year
     df['month_num'] = df['date'].dt.month
@@ -83,8 +70,6 @@ def preprocess(raw_text: str) -> pd.DataFrame:
     df['day_name'] = df['date'].dt.day_name()
     df['hour'] = df['date'].dt.hour
     df['minute'] = df['date'].dt.minute
-
-    # Period strings
     df['period'] = df['hour'].apply(lambda h: f"{h}-{(h+1)%24}" if pd.notna(h) else None)
 
     # Cleaning + tokenization + lemmatization
@@ -94,7 +79,7 @@ def preprocess(raw_text: str) -> pd.DataFrame:
         text = re.sub(r'http\S+', ' ', text)
         text = re.sub(r'www.\S+', ' ', text)
         text = re.sub(r'[^A-Za-z0-9\s]+', ' ', text)
-        words = word_tokenize(text)
+        words = word_tokenize(text)  # uses default punkt, no punkt_tab
         words = [lemmatizer.lemmatize(w) for w in words if w.lower() not in stop_words]
         return " ".join(words)
 
