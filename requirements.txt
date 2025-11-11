@@ -11,3 +11,4 @@ dateparser
 scikit-learn
 tqdm
 wordcloud
+sentence_transformers
