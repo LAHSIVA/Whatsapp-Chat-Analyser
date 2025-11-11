@@ -10,3 +10,4 @@ urlextract
 dateparser
 scikit-learn
 tqdm
+wordcloud
