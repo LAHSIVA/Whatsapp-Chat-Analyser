@@ -9,6 +9,9 @@ import nltk
 import emoji
 import numpy as np
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
+from nltk.tokenize.punkt import PunktSentenceTokenizer
+tokenizer = PunktSentenceTokenizer()  # default English
+
 nltk.download('punkt', quiet=True)
 nltk.download('vader_lexicon', quiet=True)
 extract = URLExtract()

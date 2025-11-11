@@ -4,6 +4,9 @@ import pandas as pd
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
+from nltk.tokenize.punkt import PunktSentenceTokenizer
+tokenizer = PunktSentenceTokenizer()  # default English
+
 nltk.download('punkt', quiet=True)
 nltk.download('vader_lexicon', quiet=True)
 from nltk.corpus import stopwords
