@@ -4,6 +4,8 @@ import pandas as pd
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
+nltk.download('punkt', quiet=True)
+nltk.download('vader_lexicon', quiet=True)
 from nltk.corpus import stopwords
 import os
 
