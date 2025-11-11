@@ -5,6 +5,7 @@ from collections import Counter
 from wordcloud import WordCloud
 import matplotlib.font_manager as fm
 import re
+import nltk
 import emoji
 import numpy as np
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
