@@ -1,4 +1,5 @@
 import re
+import os
 import pandas as pd
 import numpy as np
 import emoji
@@ -10,9 +11,16 @@ import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
 # ---------- NLTK Setup ----------
-nltk_data_dir = "nltk_data"  # same as preprocessor
+# Ensure consistency with preprocessor.py for NLTK data path
+nltk_data_dir = os.path.join(os.getcwd(), "nltk_data")
 nltk.data.path.append(nltk_data_dir)
-nltk.download('vader_lexicon', download_dir=nltk_data_dir, quiet=True)
+
+# Download vader_lexicon if missing
+try:
+    nltk.data.find('corpora/vader_lexicon')
+except LookupError:
+    nltk.download('vader_lexicon', download_dir=nltk_data_dir, quiet=True)
+
 vader = SentimentIntensityAnalyzer()
 extract = URLExtract()
 
@@ -44,14 +52,21 @@ def create_wordcloud(selected_user, df, stop_words_file='stop_hinglish.txt'):
         with open(stop_words_file, 'r', encoding='utf-8') as f:
             stop_words = set(w.strip() for w in f if w.strip())
     except Exception:
+        # Fallback if stop_words_file is missing
         pass
 
+    # Clean messages by removing stop words
     temp['message'] = temp['message'].apply(lambda msg: " ".join([w for w in str(msg).lower().split() if w not in stop_words]))
     text = temp['message'].str.cat(sep=" ")
+    
+    if not text.strip():
+        return None # Return None if there's no text to generate a word cloud
+
     try:
         wc = WordCloud(width=500, height=500, background_color='white', collocations=False)
         return wc.generate(text)
     except Exception:
+        # Fallback for font issues in deployment environment
         default_font = fm.findfont(fm.FontProperties(family='DejaVu Sans'))
         wc = WordCloud(width=500, height=500, background_color='white', font_path=default_font, collocations=False)
         return wc.generate(text)
@@ -70,27 +85,33 @@ def most_common_words(selected_user, df, top_n=20, stop_words_file='stop_hinglis
         pass
 
     words = [w for msg in temp['message'].astype(str) for w in msg.lower().split() if w not in stop_words]
+    
+    if not words:
+        return pd.DataFrame() # Return empty DataFrame if no words found
+
     return pd.DataFrame(Counter(words).most_common(top_n), columns=['word', 'count'])
 
 # ---------- Emojis ----------
 def emoji_helper(selected_user, df):
     if selected_user != 'Overall':
         df = df[df['user'] == selected_user]
-    emojis = [e for msg in df['message'].astype(str) for e in re.findall(emoji.get_emoji_regexp(), msg)]
+    # Use re.findall with the new emoji module function to find all emojis
+    emojis = [e for msg in df['message'].astype(str) for e in emoji.get_emoji_regexp().findall(msg)]
     return pd.DataFrame(Counter(emojis).most_common(), columns=['emoji', 'count'])
 
 # ---------- Timelines ----------
 def monthly_timeline(selected_user, df):
     if selected_user != 'Overall':
         df = df[df['user'] == selected_user]
-    timeline = df.groupby(['year','month_num','month']).count()['message'].reset_index()
+    # Filter out entries with NaT date (if any)
+    timeline = df.dropna(subset=['date']).groupby(['year','month_num','month']).count()['message'].reset_index()
     timeline['time'] = timeline.apply(lambda r: f"{r['month']}-{r['year']}", axis=1)
     return timeline[['time','message']]
 
 def daily_timeline(selected_user, df):
     if selected_user != 'Overall':
         df = df[df['user'] == selected_user]
-    daily = df.groupby('only_date').count()['message'].reset_index()
+    daily = df.dropna(subset=['only_date']).groupby('only_date').count()['message'].reset_index()
     daily.rename(columns={'message':'message'}, inplace=True)
     return daily
 
@@ -108,7 +129,9 @@ def activity_heatmap(selected_user, df):
     if selected_user != 'Overall':
         df = df[df['user'] == selected_user]
     try:
+        # Pivot table for Day vs Period Heatmap
         heatmap = df.pivot_table(index='day_name', columns='period', values='message', aggfunc='count').fillna(0)
+        # Reindex to ensure days are in order
         order = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
         heatmap = heatmap.reindex(order).fillna(0)
         return heatmap
@@ -130,5 +153,7 @@ def analyze_emotions_for_users(df):
     for user in df['user'].unique():
         if user == 'group_notification':
             continue
-        emotions[user] = [analyze_emotion(str(m)) for m in df[df['user']==user]['message']]
+        # Use only non-empty strings for analysis
+        user_messages = df[df['user']==user]['message'].astype(str)
+        emotions[user] = [analyze_emotion(str(m)) for m in user_messages if str(m).strip()]
     return emotions
